@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AdSpy Dashboard</title>
+<style>
+:root{--bg:#0f1218;--pn:#171b24;--bd:#262c38;--tx:#e8eaf0;--mut:#8b93a5;--ac:#4f8cff;--ok:#34d399;--warn:#fbbf24;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f3f4f7;--pn:#fff;--bd:#e1e4ea;--tx:#1c1e21;--mut:#667;--ac:#2563eb;--ok:#15803d;--warn:#a16207}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.ban{background:#fbbf2422;color:var(--warn);font-size:.78rem;padding:6px 16px;text-align:center;display:none}
+header{display:flex;gap:12px;align-items:center;padding:12px 20px;background:var(--pn);border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.logo{font-weight:700;font-size:1.1rem;color:var(--ac)}
+form{display:flex;gap:8px;flex:1;min-width:240px}
+input,select,button{font-size:.95rem;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+input{flex:1;min-width:120px}
+button.p{background:var(--ac);color:#fff;border:0;cursor:pointer}button:disabled{opacity:.5}
+.user{font-size:.85rem;color:var(--mut)}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;padding:16px 20px;max-width:1400px;margin:0 auto}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.pn{background:var(--pn);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.pn h2{margin:0 0 2px;font-size:1rem}.sub{color:var(--mut);font-size:.8rem;margin-bottom:12px}
+.tblw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--bd)}th{color:var(--mut);font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card img,.card video,.card svg{width:100%;display:block;max-height:240px;object-fit:cover;background:#0003}
+.cb{padding:10px;display:flex;flex-direction:column;gap:5px;flex:1}
+.mt{font-size:.75rem;color:var(--mut)}
+.tx{font-size:.85rem;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.lk{margin-top:auto;font-size:.8rem;padding-top:4px}.lk a{color:var(--ac)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--mut)}
+.dot.ok{background:var(--ok)}.dot.bad{background:#f87171}
+.kv{padding:8px 0;border-bottom:1px solid var(--bd);font-size:.85rem}.kv:last-child{border:0}
+.kv b{display:block;font-size:1.25rem;margin-top:2px}
+.soon{border:1px dashed var(--bd);border-radius:10px;padding:14px;color:var(--mut);font-size:.85rem}
+#status{color:var(--mut);font-size:.85rem;margin-bottom:10px}
+#more{display:none;margin:14px auto 0}
+</style>
+</head>
+<body>
+<div class="ban" id="ban">Demo mode: sample data only. On your server this page shows real ads.</div>
+<header>
+  <span class="logo">📡 AdSpy</span>
+  <form id="f">
+    <input id="q" placeholder="Search company ads (FB Library)" required>
+    <select id="c"><option>US</option><option>GB</option><option>CA</option><option>AU</option><option>PH</option></select>
+    <button class="p" id="go">Search</button>
+  </form>
+  <span class="user" id="user"></span>
+</header>
+<div class="wrap">
+  <div>
+    <div class="pn" id="comp"></div>
+    <div class="pn">
+      <h2>Active Ad Creatives</h2>
+      <div class="sub" id="sub">Search a company to see the ads it is running.</div>
+      <div id="status"></div>
+      <div class="grid" id="grid"></div>
+      <button id="more">Load more</button>
+    </div>
+  </div>
+  <aside>
+    <div class="pn"><h2>Integration Status</h2>
+      <div class="kv"><span class="mt">API key</span><br><span class="dot" id="d"></span><span id="st">Checking…</span></div>
+      <div class="kv"><span class="mt">Data source</span><br>Meta Ad Library via ScrapeCreators</div>
+    </div>
+    <div class="pn" id="ov"></div>
+  </aside>
+</div>
+<script>
+const DEMO=false; // the published preview sets this to true
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cursor=null;
+
+// ---- sample data (demo mode only) ----
+const SAMPLE={"InnovateTech Solutions":[
+ {page:"InnovateTech Solutions",text:"Boost your productivity with tools your team will actually use.\nStart your free trial today.",title:"Work smarter",cta:"Learn More",start:"Sep 12, 2026",active:1,hue:215},
+ {page:"InnovateTech Solutions",text:"See how 2,000+ teams cut meeting time in half.",title:"Customer stories",cta:"Learn More",start:"Sep 25, 2026",active:1,hue:265},
+ {page:"InnovateTech Solutions",text:"New: AI summaries for every project update.",title:"Meet the new dashboard",cta:"Sign Up",start:"Oct 2, 2026",active:1,hue:165},
+ {page:"InnovateTech Solutions",text:"Webinar: scaling your agency in 90 days. Seats are limited.",title:"Free webinar",cta:"Register",start:"Aug 30, 2026",active:0,hue:25}]};
+const COMP=[["Competitor A","14.2%",233],["Competitor B","15.4%",110],["Competitor C","3.6%",62]];
+function svg(h,t){return `<svg viewBox="0 0 300 180" role="img" aria-label="Sample creative"><rect width="300" height="180" fill="hsl(${h} 60% 35%)"/><text x="150" y="88" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="system-ui">${esc(t)}</text><text x="150" y="110" fill="#fff9" font-size="11" text-anchor="middle" font-family="system-ui">sample creative</text></svg>`}
+
+// ---- map a real API result to display fields (defensive) ----
+function pick(ad){const s=ad.snapshot||{},cd=(s.cards&&s.cards[0])||{};
+ const img=(s.images&&s.images[0]&&(s.images[0].original_image_url||s.images[0].resized_image_url))||cd.original_image_url||cd.resized_image_url||"";
+ const v=(s.videos&&s.videos[0])||{};const tx=(s.body&&(s.body.text||s.body))||cd.body||ad.body||"";
+ return{id:ad.ad_archive_id||ad.id||"",page:s.page_name||ad.page_name||"",text:typeof tx==="string"?tx:"",title:s.title||cd.title||"",cta:s.cta_text||cd.cta_text||"",link:s.link_url||cd.link_url||"",img,video:v.video_hd_url||v.video_sd_url||"",poster:v.video_preview_image_url||img,start:ad.start_date_string||ad.start_date||"",active:ad.is_active}}
+
+function render(ads){ads.forEach(raw=>{const a=DEMO?{...raw,id:""}:pick(raw);
+ const media=DEMO?svg(raw.hue,raw.title):a.video?`<video controls preload="none" poster="${esc(a.poster)}" src="${esc(a.video)}"></video>`:a.img?`<img loading="lazy" src="${esc(a.img)}" alt="">`:"";
+ const el=document.createElement("div");el.className="card";
+ el.innerHTML=`${media}<div class="cb"><div class="mt"><b>${esc(a.page)}</b>${a.start?" · "+esc(String(a.start)):""}${a.active===undefined?"":` · <span style="color:${a.active?"var(--ok)":"var(--mut)"}">${a.active?"Active":"Inactive"}</span>`}</div>${a.title?`<b style="font-size:.88rem">${esc(a.title)}</b>`:""}<div class="tx">${esc(a.text)}</div><div class="lk">${esc(a.cta)}${a.link?` · <a href="${esc(a.link)}" target="_blank" rel="noopener">Landing page</a>`:""}${a.id?` · <a href="https://www.facebook.com/ads/library?id=${esc(a.id)}" target="_blank" rel="noopener">View on Meta</a>`:""}</div></div>`;
+ $("#grid").appendChild(el)})}
+
+async function search(append){const company=$("#q").value.trim();$("#go").disabled=true;$("#more").style.display="none";$("#status").textContent="Loading…";
+ if(!append){$("#grid").innerHTML="";cursor=null}
+ try{let ads=[];
+  if(DEMO){const k=Object.keys(SAMPLE).find(n=>n.toLowerCase().includes(company.toLowerCase()));ads=k?SAMPLE[k]:[];
+   if(!k){$("#status").textContent="No sample data for that name. In the live app this searches the real Meta Ad Library. Try “InnovateTech”.";return}}
+  else{const qs=new URLSearchParams({company,country:$("#c").value});if(append&&cursor)qs.set("cursor",cursor);
+   const r=await fetch("api.php?"+qs);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||d.message||"Request failed");
+   ads=d.results||d.ads||[];cursor=d.cursor||null}
+  render(ads);$("#sub").textContent=`Ads found for “${company}”`;
+  const n=$("#grid").children.length;$("#status").textContent=n?`Showing ${n} ads`:"No ads found.";
+  if(cursor)$("#more").style.display="block";
+ }catch(e){$("#status").textContent="Error: "+e.message}finally{$("#go").disabled=false}}
+$("#f").addEventListener("submit",e=>{e.preventDefault();search(false)});$("#more").addEventListener("click",()=>search(true));
+
+// ---- side panels ----
+async function init(){
+ if(DEMO){$("#ban").style.display="block";$("#user").textContent="Signed in: client (demo)";$("#q").value="InnovateTech Solutions";
+  $("#d").className="dot ok";$("#st").textContent="Connected (demo)";
+  $("#comp").innerHTML=`<h2>Competitor Landscape</h2><div class="sub">Sample numbers. Needs a traffic data source (Phase 3).</div><div class="tblw"><table><tr><th>#</th><th>Competitor</th><th>Traffic share</th><th>Unique links</th></tr>${COMP.map((c,i)=>`<tr><td>${i+1}</td><td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td></tr>`).join("")}</table></div>`;
+  $("#ov").innerHTML=`<h2>Traffic &amp; Link Overview</h2><div class="sub">Sample numbers (Phase 3)</div><div class="kv"><span class="mt">Monthly visits</span><b>50K</b></div><div class="kv"><span class="mt">Linking domains</span><b>1,250</b></div><div class="kv"><span class="mt">Inbound links</span><b>8,750</b></div>`;
+  search(false);
+ }else{
+  $("#comp").innerHTML=`<h2>Competitor Landscape</h2><div class="soon">Coming in Phase 3: traffic share and link data need a separate data source.</div>`;
+  $("#ov").innerHTML=`<h2>Traffic &amp; Link Overview</h2><div class="soon">Phase 3</div>`;
+  try{const r=await fetch("api.php?status=1");const d=await r.json();$("#d").className="dot "+(d.key_set?"ok":"bad");$("#st").textContent=d.key_set?"Key found":"Missing key in .env"}catch(e){$("#d").className="dot bad";$("#st").textContent="Server not reachable"}
+ }}
+init();
+</script>
+</body>
+</html>
