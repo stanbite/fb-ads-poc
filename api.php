@@ -22,6 +22,15 @@ $country = strtoupper(trim($_GET['country'] ?? 'US'));
 $cursor  = trim($_GET['cursor'] ?? '');
 if ($company === '') { http_response_code(400); echo json_encode(['error' => 'Enter a company name']); exit; }
 
+// Cache successful results for 6 hours (saves API credits on repeat searches)
+$cacheDir = __DIR__ . '/cache';
+$cacheFile = $cacheDir . '/' . md5(strtolower($company) . '|' . $country . '|' . $cursor) . '.json';
+$ttl = 6 * 3600;
+if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+    echo file_get_contents($cacheFile);
+    exit;
+}
+
 $params = ['companyName' => $company, 'country' => $country, 'trim' => 'true'];
 if ($cursor !== '') $params['cursor'] = $cursor;
 $url = 'https://api.scrapecreators.com/v1/facebook/adLibrary/company/ads?' . http_build_query($params);
@@ -38,4 +47,12 @@ if ($body === false) { http_response_code(502); echo json_encode(['error' => cur
 curl_close($ch);
 
 http_response_code($code ?: 200);
+$decoded = json_decode($body, true);
+if ($code === 200 && is_array($decoded) && !isset($decoded['error'])) {
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0755, true);
+        @file_put_contents($cacheDir . '/.htaccess', "Require all denied\n");
+    }
+    @file_put_contents($cacheFile, $body);
+}
 echo $body;
